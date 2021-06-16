@@ -24,8 +24,56 @@ public class AesDukpt {
         return gIntermediateDerivationKeyRegister;
     }
 
+    public static void setgIntermediateDerivationKeyRegister(String[] gIntermediateDerivationKeyRegister) {
+        AesDukpt.gIntermediateDerivationKeyRegister = gIntermediateDerivationKeyRegister;
+    }
+
+    public static boolean[] getgIntermediateDerivationKeyInUse() {
+        return gIntermediateDerivationKeyInUse;
+    }
+
+    public static void setgIntermediateDerivationKeyInUse(boolean[] gIntermediateDerivationKeyInUse) {
+        AesDukpt.gIntermediateDerivationKeyInUse = gIntermediateDerivationKeyInUse;
+    }
+
+    public static int getgCurrentKey() {
+        return gCurrentKey;
+    }
+
+    public static void setgCurrentKey(int gCurrentKey) {
+        AesDukpt.gCurrentKey = gCurrentKey;
+    }
+
+    public static byte[] getgDeviceID() {
+        return gDeviceID;
+    }
+
+    public static void setgDeviceID(byte[] gDeviceID) {
+        AesDukpt.gDeviceID = gDeviceID;
+    }
+
     public static long getgCounter() {
         return gCounter;
+    }
+
+    public static void setgCounter(long gCounter) {
+        AesDukpt.gCounter = gCounter;
+    }
+
+    public static long getgShiftRegister() {
+        return gShiftRegister;
+    }
+
+    public static void setgShiftRegister(long gShiftRegister) {
+        AesDukpt.gShiftRegister = gShiftRegister;
+    }
+
+    public static KeyType getgDeriveKeyType() {
+        return gDeriveKeyType;
+    }
+
+    public static void setgDeriveKeyType(KeyType gDeriveKeyType) {
+        AesDukpt.gDeriveKeyType = gDeriveKeyType;
     }
 
     //Convert a 32-bit integer to a list of bytes in big-endian order.  Used to convert counter values to byte lists.
@@ -227,7 +275,10 @@ public class AesDukpt {
 
     //B.6.3. Update Initial Key
     //Load a new terminal initial key under a pre-existing terminal initial key.
-    //TODO Update_Initial_Key
+    public static void updateInitialKey(byte[] newInitialKey, KeyType keyType, byte[] newDeviceID) throws Exception {
+        System.out.println("Update_Initial_Key: " + toHex(newInitialKey) + ", " + keyType + ", " + toHex(newDeviceID));
+        loadInitialKey(newInitialKey, keyType, newDeviceID);
+    }
 
     //B.6.3. Generate Working Keys
     //Generate a transaction key from the intermediate derivation key registers, and update the state to prepare for the next transaction.
