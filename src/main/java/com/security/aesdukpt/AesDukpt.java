@@ -1,8 +1,10 @@
 package com.security.aesdukpt;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -88,7 +90,7 @@ public class AesDukpt {
         ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE / Byte.SIZE);
         buffer.order(ByteOrder.BIG_ENDIAN);
         buffer.putLong(value);
-        buffer.flip();
+        ((Buffer) buffer).flip();
 
         byte[] bufferArray = buffer.array();
         for (int i = 0; i < bufferArray.length / 2; i++) {
@@ -400,9 +402,10 @@ public class AesDukpt {
      * @return The encrypted data.
      */
     public static byte[] encryptAes(byte[] key, byte[] data) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec(new byte[16]);
         SecretKeySpec encryptKey = new SecretKeySpec(key, "AES");
-        Cipher encryptor = Cipher.getInstance("AES/ECB/NoPadding");
-        encryptor.init(Cipher.ENCRYPT_MODE, encryptKey);
+        Cipher encryptor = Cipher.getInstance("AES/CBC/NoPadding");
+        encryptor.init(Cipher.ENCRYPT_MODE, encryptKey, iv);
         return encryptor.doFinal(data);
     }
 
@@ -416,9 +419,10 @@ public class AesDukpt {
      * @return The decrypted data.
      */
     public static byte[] decryptAes(byte[] key, byte[] data) throws Exception {
+        IvParameterSpec iv = new IvParameterSpec(new byte[16]);
         SecretKeySpec decryptKey = new SecretKeySpec(key, "AES");
-        Cipher decryptor = Cipher.getInstance("AES/ECB/NoPadding");
-        decryptor.init(Cipher.DECRYPT_MODE, decryptKey);
+        Cipher decryptor = Cipher.getInstance("AES/CBC/NoPadding");
+        decryptor.init(Cipher.DECRYPT_MODE, decryptKey, iv);
         return decryptor.doFinal(data);
     }
 
