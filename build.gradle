@@ -1,4 +1,4 @@
-group 'com.joyner.dukpt'
+group 'io.github.joynerperez1987'
 version '1.0.0'
 
 apply plugin: 'java'
