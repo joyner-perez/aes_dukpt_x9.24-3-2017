@@ -1,4 +1,4 @@
-group 'com.security'
+group 'com.joyner.dukpt'
 version '1.0.0'
 
 apply plugin: 'java'
