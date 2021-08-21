@@ -248,68 +248,44 @@ public class AesDukpt {
     //B.6.3. Processing Routines
     //Load an initial key for computing terminal transaction keys in sequence.
     public static void loadInitialKey(byte[] initialKey, KeyType keyType, byte[] initialKeyID) throws Exception {
-        System.out.println("Load_Initial_Key("
-                + " initialKey = " + toHex(initialKey)
-                + " deriveKeyType = " + keyType
-                + " initialKeyID = " + toHex(initialKeyID)
-                + " )");
-
         gIntermediateDerivationKeyRegister = new String[NUMREG];
         gIntermediateDerivationKeyInUse = new boolean[NUMREG];
 
         gIntermediateDerivationKeyRegister[0] = toHex(initialKey);
-        System.out.println("gIntermediateDerivationKeyRegister[0] <- " + toHex(initialKey));
         gIntermediateDerivationKeyInUse[0] = true;
         gDeviceID = initialKeyID;
-        System.out.println("gDeviceID <- " + toHex(gDeviceID));
         gCounter = 0;
-        System.out.println("gCounter <- " + gCounter);
         gShiftRegister = 1L;
-        System.out.println("gShiftRegister <- " + gShiftRegister);
         gCurrentKey = 0;
         gDeriveKeyType = keyType;
-        System.out.println("gDeriveKeyType <- " + gDeriveKeyType);
 
         updateDerivationKeys(NUMREG-1, keyType);
         gCounter = gCounter + 1;
-        System.out.println("gCounter <- " + gCounter);
     }
 
     //B.6.3. Update Initial Key
     //Load a new terminal initial key under a pre-existing terminal initial key.
     public static void updateInitialKey(byte[] newInitialKey, KeyType keyType, byte[] newDeviceID) throws Exception {
-        System.out.println("Update_Initial_Key: " + toHex(newInitialKey) + ", " + keyType + ", " + toHex(newDeviceID));
         loadInitialKey(newInitialKey, keyType, newDeviceID);
     }
 
     //B.6.3. Generate Working Keys
     //Generate a transaction key from the intermediate derivation key registers, and update the state to prepare for the next transaction.
     public static byte[] generateWorkingKeys(KeyUsage keyUsage, KeyType keyType) throws Exception {
-        System.out.println("Generate_Working_Keys("
-                + " workingKeyUsage = " + keyUsage
-                + " workingKeyType = " + keyType
-                + " )");
-
         setShiftRegister();
         while (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
-            System.out.println("Key: " + gCurrentKey + ", not in use");
             gCounter = gCounter + gShiftRegister;
-            System.out.println("gCounter <- " + gCounter);
             if (gCounter > ((1 << NUMREG) - 1)) {
                 return null;
             }
             setShiftRegister();
         }
 
-        System.out.println("gCounter: " + gCounter);
-
         byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, keyUsage, keyType, gDeviceID, gCounter);
-        System.out.println("derivationData: " + toHex(derivationData));
         if (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
             return null;
         }
         byte[] workingKey = deriveKey(toByteArray(gIntermediateDerivationKeyRegister[gCurrentKey]), keyType, derivationData);
-        System.out.println("workingKey: " + toHex(workingKey));
         updateStateForNextTransaction();
         return workingKey;
     }
@@ -317,7 +293,6 @@ public class AesDukpt {
     //B.6.3. Update State for next Transaction
     //Move the counter forward, and derive new intermediate derivation keys for the next transaction.
     public static boolean updateStateForNextTransaction() throws Exception {
-        System.out.println("Update_State_for_next_Transaction");
         int oneBits = countOneBits(gCounter);
         if (oneBits <= MAX_WORK) {
             updateDerivationKeys(gCurrentKey, gDeriveKeyType);
@@ -329,7 +304,6 @@ public class AesDukpt {
             gIntermediateDerivationKeyInUse[gCurrentKey] = false;
             gCounter += gShiftRegister;
         }
-        System.out.println("gCounter <- " + gCounter);
 
         return gCounter <= (1 << NUMREG) - 1;
     }
@@ -340,25 +314,16 @@ public class AesDukpt {
     // 1. Update all the intermediate derivation key registers below the shift register after computing a transaction key.
     // 2. Update all the intermediate derivation key registers when an initial key is loaded.
     public static boolean updateDerivationKeys(int start, KeyType keyType) throws Exception {
-        System.out.println("Update_Derivation_Keys("
-                + " deriveKeyType = " + keyType
-                + " )");
-
         int i = start;
         long j = 1L << start;
 
-        System.out.println("gCurrentKey: " + gCurrentKey);
         String baseKey = gIntermediateDerivationKeyRegister[gCurrentKey];
-        System.out.println("baseKey: " + baseKey);
         while (j != 0) {
-            System.out.println("i: " + i + " gShiftRegister: " + j);
             byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, KeyUsage._KeyDerivation, keyType, gDeviceID, gCounter | j);
-            System.out.println("derivationData: " + toHex(derivationData));
             if (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
                 return false;
             }
             gIntermediateDerivationKeyRegister[i] = toHex(deriveKey(toByteArray(baseKey), keyType, derivationData));
-            System.out.println("gIntermediateDerivationKeyRegister[ " + i + " ] <- " + gIntermediateDerivationKeyRegister[i]);
             gIntermediateDerivationKeyInUse[i] = true;
             j = j >> 1L;
             i = i - 1;
@@ -374,9 +339,6 @@ public class AesDukpt {
         gCurrentKey = 0;
 
         if (gCounter == 0) {
-            System.out.println("Set_Shift_Register -> gShiftRegister: "
-                    + gShiftRegister
-                    + " gCurrentKey: " + gCurrentKey);
             return true;
         }
 
@@ -384,10 +346,6 @@ public class AesDukpt {
             gShiftRegister = gShiftRegister << 1L;
             gCurrentKey = gCurrentKey + 1;
         }
-
-        System.out.println("Set_Shift_Register -> gShiftRegister: "
-                + gShiftRegister
-                + " gCurrentKey: " + gCurrentKey);
 
         return true;
     }

@@ -1,7 +1,12 @@
 group 'com.joyner.dukpt'
-version '1.0.0'
+version '1.0.1'
 
 apply plugin: 'java'
+
+compileJava {
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+}
 
 task makeJar(type: Jar) {
     manifest {
