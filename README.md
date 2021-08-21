@@ -5,7 +5,7 @@ Implementation of the ANSI AES DUKPT standard: specified within Retail Financial
 
 How to install
 --------------
-- Add it in your root build.gradle at the end of repositories:
+1. Add it in your root build.gradle at the end of repositories:
 
 		allprojects {
 			repositories {
@@ -14,7 +14,7 @@ How to install
 			}
 		}
 
-- Add the dependency:
+2. Add the dependency:
 
 		dependencies {
 	        	implementation 'com.github.JoynerPerez1987:aes_dukpt_x9.24-3-2017:1.0.0'
