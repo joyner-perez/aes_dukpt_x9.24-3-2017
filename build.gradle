@@ -1,5 +1,5 @@
 group 'com.joyner.dukpt'
-version '1.0.1'
+version '1.0.2'
 
 apply plugin: 'java'
 
@@ -8,10 +8,10 @@ compileJava {
     targetCompatibility = '1.8'
 }
 
-task makeJar(type: Jar) {
+tasks.register('makeJar', Jar) {
     manifest {
-        attributes  'Implementation-Title': 'Java AES DUKPT',
-                    'Implementation-Version': archiveVersion
+        attributes 'Implementation-Title': 'Java AES DUKPT',
+                'Implementation-Version': archiveVersion
     }
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
@@ -22,10 +22,10 @@ repositories {
 }
 
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    testCompile group: 'junit', name: 'junit', version: '4.13.1'
 }
 
-tasks.withType(Test) {
+tasks.withType(Test).configureEach {
     testLogging {
         // set options for log level LIFECYCLE
         events "passed", "skipped", "failed", "standardOut"
@@ -33,12 +33,6 @@ tasks.withType(Test) {
         exceptionFormat "full"
         showCauses true
         showStackTraces true
-
-        // set options for log level DEBUG and INFO
-        debug {
-            events "started", "passed", "skipped", "failed", "standardOut", "standardError"
-            exceptionFormat "full"
-        }
         info.events = debug.events
         info.exceptionFormat = debug.exceptionFormat
 
