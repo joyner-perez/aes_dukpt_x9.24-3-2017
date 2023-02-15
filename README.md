@@ -17,7 +17,7 @@ How to install with Gradle
 2. Add the dependency:
 
 		dependencies {
-			implementation 'com.github.joyner-perez:aes_dukpt_x9.24-3-2017:1.0.1'
+			implementation 'com.github.joyner-perez:aes_dukpt_x9.24-3-2017:1.0.2'
 		}
 
 
@@ -40,7 +40,7 @@ How to install with Maven
            <dependency>
                <groupId>com.github.joyner-perez</groupId>
                <artifactId>aes_dukpt_x9.24-3-2017</artifactId>
-               <version>1.0.1</version>
+               <version>1.0.2</version>
            </dependency>
 
 
