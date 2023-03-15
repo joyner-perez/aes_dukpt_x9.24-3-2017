@@ -4,6 +4,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class DukptTests {
+    
     @Test
     public void testIntermediateDerivationKeys() throws Exception {
         String expectedValue = "1273671EA26AC29AFA4D1084127652A1";
@@ -19,6 +20,8 @@ public class DukptTests {
 
     @Test
     public void testGenerate32IntermediateGenerationKeys() throws Exception {
+        AesDukpt workingKey = new AesDukpt();
+
         String[] expectedValue = {
                 "4F21B565BAD9835E112B6465635EAE44",
                 "2F34D68DE10F68D38091A73B9E7C437C",
@@ -59,14 +62,16 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingKey.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
         // Assert
-        Assert.assertArrayEquals(expectedValue, AesDukpt.getgIntermediateDerivationKeyRegister());
+        Assert.assertArrayEquals(expectedValue, workingKey.getIntermediateDerivationKeyRegister());
     }
 
     @Test
-    public void testGenerateKeyEncription() throws Exception {
+    public void testGenerateKeyEncryption() throws Exception {
+        AesDukpt workingKey = new AesDukpt();
+        
         String[] expectedValue = {
                 "A35C412EFD41FDB98B69797C02DCD08F",
                 "D639514AA33AC43AD9229E433D6D4E5B",
@@ -83,7 +88,7 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingKey.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
         // execute 8 transactions and save 8 keys
         String[] keys = new String[8];
@@ -91,10 +96,10 @@ public class DukptTests {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingKey.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("Encryption Key: " + AesDukpt.toHex(keyEncription));
-            keys[i - 1] = AesDukpt.toHex(keyEncription);
+            System.out.println("Encryption Key: " + AesDukpt.toHex(keyEncryption));
+            keys[i - 1] = AesDukpt.toHex(keyEncryption);
         }
 
         // Assert
@@ -102,7 +107,9 @@ public class DukptTests {
     }
 
     @Test
-    public void testEncription() throws Exception {
+    public void testEncryption() throws Exception {
+        AesDukpt workingKey = new AesDukpt();
+        
         String[] expectedValue = {
                 "578D868399E773DFA8375199FE91D5C7",
                 "2D4E67D6BB3FEADDD76549EAB4BFFAF9",
@@ -120,28 +127,30 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingKey.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
-        // execute 8 transactions and save 8 data encripted
-        String[] datasEncripted = new String[8];
+        // execute 8 transactions and save 8 data encrypted
+        String[] datasEncrypted = new String[8];
         for (int i = 1; i < 9; i++) {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingKey.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncription));
-            String dataEncripted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncription, dataTest));
-            System.out.println("Data Encryption: " + dataEncripted);
-            datasEncripted[i - 1] = dataEncripted;
+            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncryption));
+            String dataEncrypted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncryption, dataTest));
+            System.out.println("Data Encryption: " + dataEncrypted);
+            datasEncrypted[i - 1] = dataEncrypted;
         }
 
         // Assert
-        Assert.assertArrayEquals(expectedValue, datasEncripted);
+        Assert.assertArrayEquals(expectedValue, datasEncrypted);
     }
 
     @Test
     public void testDecrypt() throws Exception {
+        AesDukpt workingKey = new AesDukpt();
+        
         String[] expectedValue = {
                 "12345678900000000000000000000000",
                 "12345678900000000000000000000000",
@@ -159,20 +168,20 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingKey.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
-        // execute 8 transactions and save 8 data encripted
+        // execute 8 transactions and save 8 data encrypted
         String[] datasDecrypted = new String[8];
         for (int i = 1; i < 9; i++) {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingKey.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncription));
-            String dataEncripted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncription, dataTest));
-            System.out.println("Data Encryption: " + dataEncripted);
-            String dataDecrypted = AesDukpt.toHex(AesDukpt.decryptAes(keyEncription, AesDukpt.toByteArray(dataEncripted)));
+            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncryption));
+            String dataEncrypted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncryption, dataTest));
+            System.out.println("Data Encryption: " + dataEncrypted);
+            String dataDecrypted = AesDukpt.toHex(AesDukpt.decryptAes(keyEncryption, AesDukpt.toByteArray(dataEncrypted)));
             System.out.println("Data Decrypted: " + dataDecrypted);
             datasDecrypted[i - 1] = dataDecrypted;
         }
