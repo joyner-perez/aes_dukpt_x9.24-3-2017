@@ -106,6 +106,64 @@ public class AesDukpt {
         return Long.bitCount(n);
     }
 
+    /**
+     * Unsigned/logical right shift of whole byte array by shiftBitCount bits.
+     * This method will alter the input byte array.
+     */
+    static byte[] shiftRight(byte[] byteArray, int shiftBitCount) {
+        final int shiftMod = shiftBitCount % 8;
+        final byte carryMask = (byte) (0xFF << (8 - shiftMod));
+        final int offsetBytes = (shiftBitCount / 8);
+
+        int sourceIndex;
+        for (int i = byteArray.length - 1; i >= 0; i--) {
+            sourceIndex = i - offsetBytes;
+            if (sourceIndex < 0) {
+                byteArray[i] = 0;
+            } else {
+                byte src = byteArray[sourceIndex];
+                byte dst = (byte) ((0xff & src) >>> shiftMod);
+                if (sourceIndex - 1 >= 0) {
+                    dst |= byteArray[sourceIndex - 1] << (8 - shiftMod) & carryMask;
+                }
+                byteArray[i] = dst;
+            }
+        }
+        return byteArray;
+    }
+
+    /**
+     * Accepts legacy format KSN (80 bits) and AES standard format KSN (96 bits).
+     * Returns just the initial key ID part of the KSN.
+     */
+    public static byte[] ksnToInitialKeyId(byte[] ksn) {
+        byte[] initialKeyId = new byte[8];
+
+        if (ksn.length == 10) {
+            // Legacy KSN
+            //  it is recommended that legacy initial key ID starting with the byte “0E” SHOULD be
+            //  reserved for use with KSN compatibility mode
+            // Example: 0E111111112222200000
+            if (ksn[0] != 0x0E) {
+                System.out.println("Warning: legacy initial key id does not start with 0E");
+            }
+
+            // Legacy KSN must fit within 59 bits, last bit is part of the counter, so it must be zeroed
+            ksn[9] &= 0xFE;
+
+            System.arraycopy(ksn, 0, initialKeyId, 0, 8);
+            // Pad first 4 bits with zero per KSN Compatibility Mode
+            return shiftRight(initialKeyId, 4);
+        } else if (ksn.length == 12) {
+            // New 96-bit KSN
+            // Example 00E111111112222200000000
+            System.arraycopy(ksn, 0, initialKeyId, 0, 8);
+            return initialKeyId;
+        } else {
+            throw new UnsupportedOperationException("Unsupported IKSN length: " + ksn.length);
+        }
+    }
+
     //B.3.2. Key Length function
     //Length of an algorithm's key, in bits.
     public static int keyLength(KeyType keyType) {
