@@ -4,7 +4,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -78,27 +77,15 @@ public class AesDukpt {
         this.deriveKeyType = deriveKeyType;
     }
 
-    //Convert a 32-bit integer to a list of bytes in big-endian order.  Used to convert counter values to byte lists.
+    //Convert a 32-bit unsigned integer to a list of bytes in big-endian order.  Used to convert counter values to byte lists.
     static byte[] intToBytes(long x) {
-        long b1 = x & 0xff;
-        long b2 = (x >>  8) & 0xff;
-        long b3 = (x >> 16) & 0xff;
-        long b4 = (x >> 24) & 0xff;
-
-        long value = b1 << 24 | b2 << 16 | b3 << 8 | b4;
-
         ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE / Byte.SIZE);
         buffer.order(ByteOrder.BIG_ENDIAN);
-        buffer.putLong(value);
-        ((Buffer) buffer).flip();
-
-        byte[] bufferArray = buffer.array();
-        for (int i = 0; i < bufferArray.length / 2; i++) {
-            byte temp = bufferArray[i];
-            bufferArray[i] = bufferArray[bufferArray.length - 1 - i];
-            bufferArray[bufferArray.length - 1 - i] = temp;
-        }
-        return bufferArray;
+        buffer.putLong(x);
+        byte[] longArray = buffer.array();
+        byte[] intArray = new byte[Integer.SIZE / Byte.SIZE];
+        System.arraycopy(longArray, intArray.length, intArray, 0, intArray.length);
+        return intArray;
     }
 
     //Count the number of 1 bits in a counter value.  Readable, but not efficient.
@@ -134,34 +121,79 @@ public class AesDukpt {
 
     /**
      * Accepts legacy format KSN (80 bits) and AES standard format KSN (96 bits).
-     * Returns just the initial key ID part of the KSN.
+     * Returns just the initial key ID part of the KSN for internal use.
      */
     public static byte[] ksnToInitialKeyId(byte[] ksn) {
         byte[] initialKeyId = new byte[8];
 
         if (ksn.length == 10) {
             // Legacy KSN
-            //  it is recommended that legacy initial key ID starting with the byte “0E” SHOULD be
-            //  reserved for use with KSN compatibility mode
-            // Example: 0E111111112222200000
+            // +-----------------------+---------------------+
+            // | Legacy Initial key ID | Transaction Counter |
+            // |       (59 bits)       |      (21 bits)      |
+            // +-----------------------+---------------------+
+            //
+            // It is recommended that legacy initial key ID starting with the byte “0E” SHOULD be
+            // reserved for use with KSN compatibility mode
+            //
+            // Key Set ID = 0E11111111
+            // Device ID = 22222
+            // Initial Key ID = 0E1111111122222
+            // Legacy KSN = 0E111111112222200000
+            // Internal KSN = 00E111111112222200000000
             if (ksn[0] != 0x0E) {
+                // Just warn, it is only a recommendation
                 System.out.println("Warning: legacy initial key id does not start with 0E");
             }
 
-            // Legacy KSN must fit within 59 bits, last bit is part of the counter, so it must be zeroed
-            ksn[9] &= 0xFE;
-
+            // Legacy KSN packs key id in first 59 bits, remaining 21 bits are the counter, copy
+            // just bytes that contain the key id
             System.arraycopy(ksn, 0, initialKeyId, 0, 8);
+
+            // need to zero counter bits in the last byte that is border between key id and counter
+            initialKeyId[7] &= 0xE0;
+
             // Pad first 4 bits with zero per KSN Compatibility Mode
             return shiftRight(initialKeyId, 4);
         } else if (ksn.length == 12) {
             // New 96-bit KSN
-            // Example 00E111111112222200000000
+            // +-----------------------+---------------------+
+            // |    Initial key ID     | Transaction Counter |
+            // |       (64 bits)       |      (32 bits)      |
+            // +-----------------------+---------------------+
+            //
+            // Example 123456789012345600000001
             System.arraycopy(ksn, 0, initialKeyId, 0, 8);
             return initialKeyId;
         } else {
             throw new UnsupportedOperationException("Unsupported IKSN length: " + ksn.length);
         }
+    }
+
+    /**
+     * Extract the counter from a KSN. Returns a long to ensure it is always positive.
+     */
+    public static long ksnToCounter(byte[] ksn) {
+        // Destination is java-size long
+        byte[] counterBytes = new byte[8];
+
+        if (ksn.length == 10) {
+            // Legacy KSN, counter is right 21 bits
+            // Position of the byte where key id and counter meet
+            int borderBytePos = counterBytes.length - 3;
+            // Copy right 24 bits to the end of a 32 bit buffer
+            System.arraycopy(ksn, 7, counterBytes, borderBytePos, 3);
+            // Clear left 3 bits of the 24 bits copied to preserve just 21 bits
+            counterBytes[borderBytePos] &= 0x1F;
+        } else if (ksn.length == 12) {
+            // New 96-bit KSN, counter is right 32 bits
+            System.arraycopy(ksn, 8, counterBytes, counterBytes.length - 4, 4);
+        } else {
+            throw new UnsupportedOperationException("Unsupported IKSN length: " + ksn.length);
+        }
+
+        ByteBuffer buffer = ByteBuffer.wrap(counterBytes);
+        return buffer.getLong();
     }
 
     //B.3.2. Key Length function
@@ -325,13 +357,44 @@ public class AesDukpt {
         loadInitialKey(newInitialKey, keyType, newDeviceID);
     }
 
+    /**
+     * Derive the working key that the terminal used for encryption using the KSN.
+     */
+    public static byte[] hostDeriveWorkingKey(byte[] initialKey, KeyType deriveKeyType, KeyUsage workingKeyUsage,
+                                              KeyType workingKeyType, byte[] ksn) throws Exception {
+        boolean isLegacy = ksn.length == 10;
+
+        // set the most significant bit to one and all other bits to zero
+        // legacy mode uses 21-bit counter, otherwise counter is 32-bit
+        long mask = isLegacy ? 1L << 21 : 1L << 31;
+        long workingCounter = 0;
+        long transactionCounter = ksnToCounter(ksn);
+        byte[] initialKeyID = ksnToInitialKeyId(ksn);
+        byte[] derivationData;
+        byte[] derivationKey = initialKey;
+
+        while (mask > 0) {
+            if ((mask & transactionCounter) != 0) {
+                workingCounter = workingCounter | mask;
+                derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey,
+                        KeyUsage._KeyDerivation, deriveKeyType, initialKeyID, workingCounter);
+                derivationKey = deriveKey(derivationKey, deriveKeyType, derivationData);
+            }
+            mask = mask >> 1;
+        }
+
+        derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey,
+                workingKeyUsage, workingKeyType, initialKeyID, transactionCounter);
+        return deriveKey(derivationKey, workingKeyType, derivationData);
+    }
+
     //B.6.3. Generate Working Keys
     //Generate a transaction key from the intermediate derivation key registers, and update the state to prepare for the next transaction.
     public byte[] generateWorkingKeys(KeyUsage keyUsage, KeyType keyType) throws Exception {
         setShiftRegister();
         while (!intermediateDerivationKeyInUse[currentKey]) {
             counter = counter + shiftRegister;
-            if (counter > ((1 << NUMREG) - 1)) {
+            if (counter > ((1L << NUMREG) - 1)) {
                 return null;
             }
             setShiftRegister();
@@ -361,7 +424,7 @@ public class AesDukpt {
             counter += shiftRegister;
         }
 
-        return counter <= (1 << NUMREG) - 1;
+        return counter <= (1L << NUMREG) - 1;
     }
 
     //B.6.3. Update Derivation Keys
@@ -446,6 +509,7 @@ public class AesDukpt {
      * @param s A representation of a hexadecimal number without any leading qualifiers such as "0x" or "x".
      */
     static byte[] toByteArray(String s) {
+        s = s.replace(" ", "");
         int len = s.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
