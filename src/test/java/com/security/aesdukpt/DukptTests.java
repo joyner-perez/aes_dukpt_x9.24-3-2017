@@ -4,6 +4,48 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class DukptTests {
+
+    @Test
+    public void testIntToBytes() {
+        byte[] intBytes;
+        intBytes = AesDukpt.intToBytes(4294967295L);
+        Assert.assertArrayEquals(AesDukpt.toByteArray("FFFFFFFF"), intBytes);
+
+        intBytes = AesDukpt.intToBytes(1);
+        Assert.assertArrayEquals(AesDukpt.toByteArray("00000001"), intBytes);
+
+        intBytes = AesDukpt.intToBytes(2147483648L);
+        Assert.assertArrayEquals(AesDukpt.toByteArray("80000000"), intBytes);
+    }
+
+    @Test
+    public void testKsnToCounter80bit() {
+        byte[] ksn = AesDukpt.toByteArray("0E11111111FFFFFF0000");
+        long counter = AesDukpt.ksnToCounter(ksn);
+        Assert.assertEquals(2031616L, counter);
+    }
+
+    @Test
+    public void testKsnToCounter96bit() {
+        byte[] ksn = AesDukpt.toByteArray("123456789012345680000001");
+        long counter = AesDukpt.ksnToCounter(ksn);
+        Assert.assertEquals(2147483649L, counter);
+    }
+
+    @Test
+    public void testKsnToKeyId80bit() {
+        byte[] ksn = AesDukpt.toByteArray("0E11111111FFFFFF0000");
+        byte[] keyId = AesDukpt.ksnToInitialKeyId(ksn);
+        Assert.assertArrayEquals(AesDukpt.toByteArray("00E11111111FFFFE"), keyId);
+    }
+
+    @Test
+    public void testKsnToKeyId96bit() {
+        byte[] ksn = AesDukpt.toByteArray("123456789012345600000001");
+        byte[] keyId = AesDukpt.ksnToInitialKeyId(ksn);
+        Assert.assertArrayEquals(AesDukpt.toByteArray("1234567890123456"), keyId);
+    }
+
     @Test
     public void testIntermediateDerivationKeys() throws Exception {
         String expectedValue = "1273671EA26AC29AFA4D1084127652A1";
@@ -19,6 +61,8 @@ public class DukptTests {
 
     @Test
     public void testGenerate32IntermediateGenerationKeys() throws Exception {
+        AesDukpt workingDukpt = new AesDukpt();
+
         String[] expectedValue = {
                 "4F21B565BAD9835E112B6465635EAE44",
                 "2F34D68DE10F68D38091A73B9E7C437C",
@@ -59,14 +103,16 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
         // Assert
-        Assert.assertArrayEquals(expectedValue, AesDukpt.getgIntermediateDerivationKeyRegister());
+        Assert.assertArrayEquals(expectedValue, workingDukpt.getIntermediateDerivationKeyRegister());
     }
 
     @Test
-    public void testGenerateKeyEncription() throws Exception {
+    public void testGenerateKeyEncryption() throws Exception {
+        AesDukpt workingDukpt = new AesDukpt();
+        
         String[] expectedValue = {
                 "A35C412EFD41FDB98B69797C02DCD08F",
                 "D639514AA33AC43AD9229E433D6D4E5B",
@@ -83,7 +129,7 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
         // execute 8 transactions and save 8 keys
         String[] keys = new String[8];
@@ -91,10 +137,10 @@ public class DukptTests {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("Encryption Key: " + AesDukpt.toHex(keyEncription));
-            keys[i - 1] = AesDukpt.toHex(keyEncription);
+            System.out.println("Encryption Key: " + AesDukpt.toHex(keyEncryption));
+            keys[i - 1] = AesDukpt.toHex(keyEncryption);
         }
 
         // Assert
@@ -102,7 +148,9 @@ public class DukptTests {
     }
 
     @Test
-    public void testEncription() throws Exception {
+    public void testEncryption() throws Exception {
+        AesDukpt workingDukpt = new AesDukpt();
+        
         String[] expectedValue = {
                 "578D868399E773DFA8375199FE91D5C7",
                 "2D4E67D6BB3FEADDD76549EAB4BFFAF9",
@@ -120,28 +168,30 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
-        // execute 8 transactions and save 8 data encripted
-        String[] datasEncripted = new String[8];
+        // execute 8 transactions and save 8 data encrypted
+        String[] datasEncrypted = new String[8];
         for (int i = 1; i < 9; i++) {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncription));
-            String dataEncripted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncription, dataTest));
-            System.out.println("Data Encryption: " + dataEncripted);
-            datasEncripted[i - 1] = dataEncripted;
+            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncryption));
+            String dataEncrypted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncryption, dataTest));
+            System.out.println("Data Encryption: " + dataEncrypted);
+            datasEncrypted[i - 1] = dataEncrypted;
         }
 
         // Assert
-        Assert.assertArrayEquals(expectedValue, datasEncripted);
+        Assert.assertArrayEquals(expectedValue, datasEncrypted);
     }
 
     @Test
     public void testDecrypt() throws Exception {
+        AesDukpt workingDukpt = new AesDukpt();
+        
         String[] expectedValue = {
                 "12345678900000000000000000000000",
                 "12345678900000000000000000000000",
@@ -159,20 +209,20 @@ public class DukptTests {
 
         byte[] deriveInitialKey = AesDukpt.deriveInitialKey(key, KeyType._AES128, initialDataKeyId);
         System.out.println("Derivar initial key: " + AesDukpt.toHex(deriveInitialKey));
-        AesDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
+        workingDukpt.loadInitialKey(deriveInitialKey, KeyType._AES128, initialDataKeyId);
 
-        // execute 8 transactions and save 8 data encripted
+        // execute 8 transactions and save 8 data encrypted
         String[] datasDecrypted = new String[8];
         for (int i = 1; i < 9; i++) {
             System.out.println("");
             System.out.println("Counter: " + i);
 
-            byte[] keyEncription = AesDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
+            byte[] keyEncryption = workingDukpt.generateWorkingKeys(KeyUsage._DataEncryptionEncrypt, KeyType._AES128);
             System.out.println("");
-            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncription));
-            String dataEncripted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncription, dataTest));
-            System.out.println("Data Encryption: " + dataEncripted);
-            String dataDecrypted = AesDukpt.toHex(AesDukpt.decryptAes(keyEncription, AesDukpt.toByteArray(dataEncripted)));
+            System.out.println("PIN Encryption Key:" + AesDukpt.toHex(keyEncryption));
+            String dataEncrypted = AesDukpt.toHex(AesDukpt.encryptAes(keyEncryption, dataTest));
+            System.out.println("Data Encryption: " + dataEncrypted);
+            String dataDecrypted = AesDukpt.toHex(AesDukpt.decryptAes(keyEncryption, AesDukpt.toByteArray(dataEncrypted)));
             System.out.println("Data Decrypted: " + dataDecrypted);
             datasDecrypted[i - 1] = dataDecrypted;
         }
@@ -180,4 +230,55 @@ public class DukptTests {
         // Assert
         Assert.assertArrayEquals(expectedValue, datasDecrypted);
     }
+
+    @Test
+    public void testHostDeriveWorkingKeyPinEncryption() throws Exception {
+        String initialKeyIdHex = "12345678 90123456";
+        byte[] initialKey = AesDukpt.toByteArray("1273671E A26AC29A FA4D1084 127652A1");
+        long[] counterTestVector = new long[] { 1, 2, 3, 7, 131073L, 8675309L, 4294901760L, };
+        byte[][] pinEncryptionKeysExpected = new byte[][] {
+                AesDukpt.toByteArray("AF8CB133 A78F8DC2 D1359F18 527593FB"),
+                AesDukpt.toByteArray("D30BDC73 EC9714B0 00BEC66B DB7B6D09"),
+                AesDukpt.toByteArray("7D69F01F 3B45449F 62C7816E CE723268"),
+                AesDukpt.toByteArray("6ECF912F 3B18CA11 A7A27BB6 0705FD09"),
+                AesDukpt.toByteArray("8AC85C93 EED24605 4ADC3104 479115A6"),
+                AesDukpt.toByteArray("D1DDA386 AA4A556A F0119FDC B5D132C6"),
+                AesDukpt.toByteArray("27EFAC1D 15863258 8F4AC69E 45C247C4"),
+        };
+        byte[][] macGenerationKeysExpected = new byte[][] {
+                AesDukpt.toByteArray("A2DC23DE 6FDE0824 A2BC321E 08E4B8B7"),
+                AesDukpt.toByteArray("484C3B06 E8562704 528CD5B4 6FB12FB6"),
+                AesDukpt.toByteArray("A5DF7D9D 800CA769 766F0C77 CA4E6E6C"),
+                AesDukpt.toByteArray("BAA08CA2 63C69525 BC6B1BA8 F4275D69"),
+                AesDukpt.toByteArray("EF7C9461 E2AFED2A 8012CC63 01CFEEBE"),
+                AesDukpt.toByteArray("89365C79 70950CAC 0A6261FF C7DB26C6"),
+                AesDukpt.toByteArray("AE558BAB C206D303 FDF68B11 81F228C6"),
+        };
+        byte[][] dataEncryptionKeysExpected = new byte[][] {
+                AesDukpt.toByteArray("A35C412E FD41FDB9 8B69797C 02DCD08F"),
+                AesDukpt.toByteArray("D639514A A33AC43A D9229E43 3D6D4E5B"),
+                AesDukpt.toByteArray("EF17F6AB 45B4820C 93A3DCB2 1BC491AD"),
+                AesDukpt.toByteArray("0FA8F1F0 A2DD7B10 05A862D7 7CDED698"),
+                AesDukpt.toByteArray("B93B4BF0 D52163B3 CF9312F8 E55629A3"),
+                AesDukpt.toByteArray("B1E4D900 6A87DD08 D87F11A1 24D35517"),
+                AesDukpt.toByteArray("08878BFC C45CA5AE F6A1AB40 BAC882B5"),
+        };
+
+        for (int i = 0; i < counterTestVector.length; i++) {
+            long counter = counterTestVector[i];
+            byte[] ksn = AesDukpt.toByteArray(initialKeyIdHex + AesDukpt.toHex(AesDukpt.intToBytes(counter)));
+
+            byte[] pinKey = AesDukpt.hostDeriveWorkingKey(initialKey, KeyType._AES128, KeyUsage._PINEncryption,
+                    KeyType._AES128, ksn);
+            byte[] macKey = AesDukpt.hostDeriveWorkingKey(initialKey, KeyType._AES128, KeyUsage._MessageAuthenticationGeneration,
+                    KeyType._AES128, ksn);
+            byte[] dataKey = AesDukpt.hostDeriveWorkingKey(initialKey, KeyType._AES128, KeyUsage._DataEncryptionEncrypt,
+                    KeyType._AES128, ksn);
+
+            Assert.assertArrayEquals(pinEncryptionKeysExpected[i], pinKey);
+            Assert.assertArrayEquals(macGenerationKeysExpected[i], macKey);
+            Assert.assertArrayEquals(dataEncryptionKeysExpected[i], dataKey);
+        }
+    }
+
 }

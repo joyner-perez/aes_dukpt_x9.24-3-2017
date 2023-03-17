@@ -4,7 +4,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -14,96 +13,187 @@ public class AesDukpt {
     private static final int NUMREG = 32;
     private static final int MAX_WORK = 16;
 
-    private static String[] gIntermediateDerivationKeyRegister;
-    private static boolean[] gIntermediateDerivationKeyInUse;
-    private static int gCurrentKey;
-    private static byte[] gDeviceID;
-    private static long gCounter;
-    private static long gShiftRegister;
-    private static KeyType gDeriveKeyType;
+    private String[] intermediateDerivationKeyRegister;
+    private boolean[] intermediateDerivationKeyInUse;
+    private int currentKey;
+    private byte[] deviceID;
+    private long counter;
+    private long shiftRegister;
+    private KeyType deriveKeyType;
 
-    public static String[] getgIntermediateDerivationKeyRegister() {
-        return gIntermediateDerivationKeyRegister;
+    String[] getIntermediateDerivationKeyRegister() {
+        return intermediateDerivationKeyRegister;
     }
 
-    public static void setgIntermediateDerivationKeyRegister(String[] gIntermediateDerivationKeyRegister) {
-        AesDukpt.gIntermediateDerivationKeyRegister = gIntermediateDerivationKeyRegister;
+    void setIntermediateDerivationKeyRegister(String[] intermediateDerivationKeyRegister) {
+        this.intermediateDerivationKeyRegister = intermediateDerivationKeyRegister;
     }
 
-    public static boolean[] getgIntermediateDerivationKeyInUse() {
-        return gIntermediateDerivationKeyInUse;
+    boolean[] getIntermediateDerivationKeyInUse() {
+        return intermediateDerivationKeyInUse;
     }
 
-    public static void setgIntermediateDerivationKeyInUse(boolean[] gIntermediateDerivationKeyInUse) {
-        AesDukpt.gIntermediateDerivationKeyInUse = gIntermediateDerivationKeyInUse;
+    void setIntermediateDerivationKeyInUse(boolean[] intermediateDerivationKeyInUse) {
+        this.intermediateDerivationKeyInUse = intermediateDerivationKeyInUse;
     }
 
-    public static int getgCurrentKey() {
-        return gCurrentKey;
+    int getCurrentKey() {
+        return currentKey;
     }
 
-    public static void setgCurrentKey(int gCurrentKey) {
-        AesDukpt.gCurrentKey = gCurrentKey;
+    void setCurrentKey(int currentKey) {
+        this.currentKey = currentKey;
     }
 
-    public static byte[] getgDeviceID() {
-        return gDeviceID;
+    byte[] getDeviceID() {
+        return deviceID;
     }
 
-    public static void setgDeviceID(byte[] gDeviceID) {
-        AesDukpt.gDeviceID = gDeviceID;
+    void setDeviceID(byte[] deviceID) {
+        this.deviceID = deviceID;
     }
 
-    public static long getgCounter() {
-        return gCounter;
+    public long getCounter() {
+        return counter;
     }
 
-    public static void setgCounter(long gCounter) {
-        AesDukpt.gCounter = gCounter;
+    void setCounter(long counter) {
+        this.counter = counter;
     }
 
-    public static long getgShiftRegister() {
-        return gShiftRegister;
+    long getShiftRegister() {
+        return shiftRegister;
     }
 
-    public static void setgShiftRegister(long gShiftRegister) {
-        AesDukpt.gShiftRegister = gShiftRegister;
+    void setShiftRegister(long shiftRegister) {
+        this.shiftRegister = shiftRegister;
     }
 
-    public static KeyType getgDeriveKeyType() {
-        return gDeriveKeyType;
+    public KeyType getDeriveKeyType() {
+        return deriveKeyType;
     }
 
-    public static void setgDeriveKeyType(KeyType gDeriveKeyType) {
-        AesDukpt.gDeriveKeyType = gDeriveKeyType;
+    void setDeriveKeyType(KeyType deriveKeyType) {
+        this.deriveKeyType = deriveKeyType;
     }
 
-    //Convert a 32-bit integer to a list of bytes in big-endian order.  Used to convert counter values to byte lists.
-    public static byte[] intToBytes(long x) {
-        long b1 = x & 0xff;
-        long b2 = (x >>  8) & 0xff;
-        long b3 = (x >> 16) & 0xff;
-        long b4 = (x >> 24) & 0xff;
-
-        long value = b1 << 24 | b2 << 16 | b3 << 8 | b4;
-
+    //Convert a 32-bit unsigned integer to a list of bytes in big-endian order.  Used to convert counter values to byte lists.
+    static byte[] intToBytes(long x) {
         ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE / Byte.SIZE);
         buffer.order(ByteOrder.BIG_ENDIAN);
-        buffer.putLong(value);
-        ((Buffer) buffer).flip();
-
-        byte[] bufferArray = buffer.array();
-        for (int i = 0; i < bufferArray.length / 2; i++) {
-            byte temp = bufferArray[i];
-            bufferArray[i] = bufferArray[bufferArray.length - 1 - i];
-            bufferArray[bufferArray.length - 1 - i] = temp;
-        }
-        return bufferArray;
+        buffer.putLong(x);
+        byte[] longArray = buffer.array();
+        byte[] intArray = new byte[Integer.SIZE / Byte.SIZE];
+        System.arraycopy(longArray, intArray.length, intArray, 0, intArray.length);
+        return intArray;
     }
 
     //Count the number of 1 bits in a counter value.  Readable, but not efficient.
-    public static int countOneBits(long n) {
+    static int countOneBits(long n) {
         return Long.bitCount(n);
+    }
+
+    /**
+     * Unsigned/logical right shift of whole byte array by shiftBitCount bits.
+     * This method will alter the input byte array.
+     */
+    static byte[] shiftRight(byte[] byteArray, int shiftBitCount) {
+        final int shiftMod = shiftBitCount % 8;
+        final byte carryMask = (byte) (0xFF << (8 - shiftMod));
+        final int offsetBytes = (shiftBitCount / 8);
+
+        int sourceIndex;
+        for (int i = byteArray.length - 1; i >= 0; i--) {
+            sourceIndex = i - offsetBytes;
+            if (sourceIndex < 0) {
+                byteArray[i] = 0;
+            } else {
+                byte src = byteArray[sourceIndex];
+                byte dst = (byte) ((0xff & src) >>> shiftMod);
+                if (sourceIndex - 1 >= 0) {
+                    dst |= byteArray[sourceIndex - 1] << (8 - shiftMod) & carryMask;
+                }
+                byteArray[i] = dst;
+            }
+        }
+        return byteArray;
+    }
+
+    /**
+     * Accepts legacy format KSN (80 bits) and AES standard format KSN (96 bits).
+     * Returns just the initial key ID part of the KSN for internal use.
+     */
+    public static byte[] ksnToInitialKeyId(byte[] ksn) {
+        byte[] initialKeyId = new byte[8];
+
+        if (ksn.length == 10) {
+            // Legacy KSN
+            // +-----------------------+---------------------+
+            // | Legacy Initial key ID | Transaction Counter |
+            // |       (59 bits)       |      (21 bits)      |
+            // +-----------------------+---------------------+
+            //
+            // It is recommended that legacy initial key ID starting with the byte “0E” SHOULD be
+            // reserved for use with KSN compatibility mode
+            //
+            // Key Set ID = 0E11111111
+            // Device ID = 22222
+            // Initial Key ID = 0E1111111122222
+            // Legacy KSN = 0E111111112222200000
+            // Internal KSN = 00E111111112222200000000
+            if (ksn[0] != 0x0E) {
+                // Just warn, it is only a recommendation
+                System.out.println("Warning: legacy initial key id does not start with 0E");
+            }
+
+            // Legacy KSN packs key id in first 59 bits, remaining 21 bits are the counter, copy
+            // just bytes that contain the key id
+            System.arraycopy(ksn, 0, initialKeyId, 0, 8);
+
+            // need to zero counter bits in the last byte that is border between key id and counter
+            initialKeyId[7] &= 0xE0;
+
+            // Pad first 4 bits with zero per KSN Compatibility Mode
+            return shiftRight(initialKeyId, 4);
+        } else if (ksn.length == 12) {
+            // New 96-bit KSN
+            // +-----------------------+---------------------+
+            // |    Initial key ID     | Transaction Counter |
+            // |       (64 bits)       |      (32 bits)      |
+            // +-----------------------+---------------------+
+            //
+            // Example 123456789012345600000001
+            System.arraycopy(ksn, 0, initialKeyId, 0, 8);
+            return initialKeyId;
+        } else {
+            throw new UnsupportedOperationException("Unsupported IKSN length: " + ksn.length);
+        }
+    }
+
+    /**
+     * Extract the counter from a KSN. Returns a long to ensure it is always positive.
+     */
+    public static long ksnToCounter(byte[] ksn) {
+        // Destination is java-size long
+        byte[] counterBytes = new byte[8];
+
+        if (ksn.length == 10) {
+            // Legacy KSN, counter is right 21 bits
+            // Position of the byte where key id and counter meet
+            int borderBytePos = counterBytes.length - 3;
+            // Copy right 24 bits to the end of a 32 bit buffer
+            System.arraycopy(ksn, 7, counterBytes, borderBytePos, 3);
+            // Clear left 3 bits of the 24 bits copied to preserve just 21 bits
+            counterBytes[borderBytePos] &= 0x1F;
+        } else if (ksn.length == 12) {
+            // New 96-bit KSN, counter is right 32 bits
+            System.arraycopy(ksn, 8, counterBytes, counterBytes.length - 4, 4);
+        } else {
+            throw new UnsupportedOperationException("Unsupported IKSN length: " + ksn.length);
+        }
+
+        ByteBuffer buffer = ByteBuffer.wrap(counterBytes);
+        return buffer.getLong();
     }
 
     //B.3.2. Key Length function
@@ -128,9 +218,7 @@ public class AesDukpt {
     public static byte[] deriveKey(byte[] derivationKey, KeyType keyType, byte[] derivationData) throws Exception {
         int L = keyLength(keyType);
         byte[] result = encryptAes(derivationKey, derivationData);
-
-        double val = L / 8;
-        int n = (int) Math.floor(val);
+        int n = L / 8;
         return Arrays.copyOfRange(result, 0, n);
     }
 
@@ -247,65 +335,96 @@ public class AesDukpt {
 
     //B.6.3. Processing Routines
     //Load an initial key for computing terminal transaction keys in sequence.
-    public static void loadInitialKey(byte[] initialKey, KeyType keyType, byte[] initialKeyID) throws Exception {
-        gIntermediateDerivationKeyRegister = new String[NUMREG];
-        gIntermediateDerivationKeyInUse = new boolean[NUMREG];
+    public void loadInitialKey(byte[] initialKey, KeyType keyType, byte[] initialKeyID) throws Exception {
+        intermediateDerivationKeyRegister = new String[NUMREG];
+        intermediateDerivationKeyInUse = new boolean[NUMREG];
 
-        gIntermediateDerivationKeyRegister[0] = toHex(initialKey);
-        gIntermediateDerivationKeyInUse[0] = true;
-        gDeviceID = initialKeyID;
-        gCounter = 0;
-        gShiftRegister = 1L;
-        gCurrentKey = 0;
-        gDeriveKeyType = keyType;
+        intermediateDerivationKeyRegister[0] = toHex(initialKey);
+        intermediateDerivationKeyInUse[0] = true;
+        deviceID = initialKeyID;
+        counter = 0;
+        shiftRegister = 1L;
+        currentKey = 0;
+        deriveKeyType = keyType;
 
         updateDerivationKeys(NUMREG-1, keyType);
-        gCounter = gCounter + 1;
+        counter = counter + 1;
     }
 
     //B.6.3. Update Initial Key
     //Load a new terminal initial key under a pre-existing terminal initial key.
-    public static void updateInitialKey(byte[] newInitialKey, KeyType keyType, byte[] newDeviceID) throws Exception {
+    public void updateInitialKey(byte[] newInitialKey, KeyType keyType, byte[] newDeviceID) throws Exception {
         loadInitialKey(newInitialKey, keyType, newDeviceID);
+    }
+
+    /**
+     * Derive the working key that the terminal used for encryption using the KSN.
+     */
+    public static byte[] hostDeriveWorkingKey(byte[] initialKey, KeyType deriveKeyType, KeyUsage workingKeyUsage,
+                                              KeyType workingKeyType, byte[] ksn) throws Exception {
+        boolean isLegacy = ksn.length == 10;
+
+        // set the most significant bit to one and all other bits to zero
+        // legacy mode uses 21-bit counter, otherwise counter is 32-bit
+        long mask = isLegacy ? 1L << 21 : 1L << 31;
+        long workingCounter = 0;
+        long transactionCounter = ksnToCounter(ksn);
+        byte[] initialKeyID = ksnToInitialKeyId(ksn);
+        byte[] derivationData;
+        byte[] derivationKey = initialKey;
+
+        while (mask > 0) {
+            if ((mask & transactionCounter) != 0) {
+                workingCounter = workingCounter | mask;
+                derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey,
+                        KeyUsage._KeyDerivation, deriveKeyType, initialKeyID, workingCounter);
+                derivationKey = deriveKey(derivationKey, deriveKeyType, derivationData);
+            }
+            mask = mask >> 1;
+        }
+
+        derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey,
+                workingKeyUsage, workingKeyType, initialKeyID, transactionCounter);
+        return deriveKey(derivationKey, workingKeyType, derivationData);
     }
 
     //B.6.3. Generate Working Keys
     //Generate a transaction key from the intermediate derivation key registers, and update the state to prepare for the next transaction.
-    public static byte[] generateWorkingKeys(KeyUsage keyUsage, KeyType keyType) throws Exception {
+    public byte[] generateWorkingKeys(KeyUsage keyUsage, KeyType keyType) throws Exception {
         setShiftRegister();
-        while (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
-            gCounter = gCounter + gShiftRegister;
-            if (gCounter > ((1 << NUMREG) - 1)) {
+        while (!intermediateDerivationKeyInUse[currentKey]) {
+            counter = counter + shiftRegister;
+            if (counter > ((1L << NUMREG) - 1)) {
                 return null;
             }
             setShiftRegister();
         }
 
-        byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, keyUsage, keyType, gDeviceID, gCounter);
-        if (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
+        byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, keyUsage, keyType, deviceID, counter);
+        if (!intermediateDerivationKeyInUse[currentKey]) {
             return null;
         }
-        byte[] workingKey = deriveKey(toByteArray(gIntermediateDerivationKeyRegister[gCurrentKey]), keyType, derivationData);
+        byte[] workingKey = deriveKey(toByteArray(intermediateDerivationKeyRegister[currentKey]), keyType, derivationData);
         updateStateForNextTransaction();
         return workingKey;
     }
 
     //B.6.3. Update State for next Transaction
     //Move the counter forward, and derive new intermediate derivation keys for the next transaction.
-    public static boolean updateStateForNextTransaction() throws Exception {
-        int oneBits = countOneBits(gCounter);
+    public boolean updateStateForNextTransaction() throws Exception {
+        int oneBits = countOneBits(counter);
         if (oneBits <= MAX_WORK) {
-            updateDerivationKeys(gCurrentKey, gDeriveKeyType);
-            gIntermediateDerivationKeyRegister[gCurrentKey] = "0";
-            gIntermediateDerivationKeyInUse[gCurrentKey] = false;
-            gCounter++;
+            updateDerivationKeys(currentKey, deriveKeyType);
+            intermediateDerivationKeyRegister[currentKey] = "0";
+            intermediateDerivationKeyInUse[currentKey] = false;
+            counter++;
         } else {
-            gIntermediateDerivationKeyRegister[gCurrentKey] = "0";
-            gIntermediateDerivationKeyInUse[gCurrentKey] = false;
-            gCounter += gShiftRegister;
+            intermediateDerivationKeyRegister[currentKey] = "0";
+            intermediateDerivationKeyInUse[currentKey] = false;
+            counter += shiftRegister;
         }
 
-        return gCounter <= (1 << NUMREG) - 1;
+        return counter <= (1L << NUMREG) - 1;
     }
 
     //B.6.3. Update Derivation Keys
@@ -313,18 +432,18 @@ public class AesDukpt {
     //This is used to:
     // 1. Update all the intermediate derivation key registers below the shift register after computing a transaction key.
     // 2. Update all the intermediate derivation key registers when an initial key is loaded.
-    public static boolean updateDerivationKeys(int start, KeyType keyType) throws Exception {
+    public boolean updateDerivationKeys(int start, KeyType keyType) throws Exception {
         int i = start;
         long j = 1L << start;
 
-        String baseKey = gIntermediateDerivationKeyRegister[gCurrentKey];
+        String baseKey = intermediateDerivationKeyRegister[currentKey];
         while (j != 0) {
-            byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, KeyUsage._KeyDerivation, keyType, gDeviceID, gCounter | j);
-            if (!gIntermediateDerivationKeyInUse[gCurrentKey]) {
+            byte[] derivationData = createDerivationData(DerivationPurpose._DerivationOrWorkingKey, KeyUsage._KeyDerivation, keyType, deviceID, counter | j);
+            if (!intermediateDerivationKeyInUse[currentKey]) {
                 return false;
             }
-            gIntermediateDerivationKeyRegister[i] = toHex(deriveKey(toByteArray(baseKey), keyType, derivationData));
-            gIntermediateDerivationKeyInUse[i] = true;
+            intermediateDerivationKeyRegister[i] = toHex(deriveKey(toByteArray(baseKey), keyType, derivationData));
+            intermediateDerivationKeyInUse[i] = true;
             j = j >> 1L;
             i = i - 1;
         }
@@ -334,17 +453,17 @@ public class AesDukpt {
 
     //B.6.3. Set Shift Register
     //Set the shift register to the value of the rightmost '1' bit in the counter.
-    public static boolean setShiftRegister() {
-        gShiftRegister = 1L;
-        gCurrentKey = 0;
+    public boolean setShiftRegister() {
+        shiftRegister = 1L;
+        currentKey = 0;
 
-        if (gCounter == 0) {
+        if (counter == 0) {
             return true;
         }
 
-        while ((gShiftRegister & gCounter) == 0) {
-            gShiftRegister = gShiftRegister << 1L;
-            gCurrentKey = gCurrentKey + 1;
+        while ((shiftRegister & counter) == 0) {
+            shiftRegister = shiftRegister << 1L;
+            currentKey = currentKey + 1;
         }
 
         return true;
@@ -359,7 +478,7 @@ public class AesDukpt {
      * @param data The data to encrypt.
      * @return The encrypted data.
      */
-    public static byte[] encryptAes(byte[] key, byte[] data) throws Exception {
+    static byte[] encryptAes(byte[] key, byte[] data) throws Exception {
         IvParameterSpec iv = new IvParameterSpec(new byte[16]);
         SecretKeySpec encryptKey = new SecretKeySpec(key, "AES");
         Cipher encryptor = Cipher.getInstance("AES/CBC/NoPadding");
@@ -376,7 +495,7 @@ public class AesDukpt {
      * @param data The data to decrypt.
      * @return The decrypted data.
      */
-    public static byte[] decryptAes(byte[] key, byte[] data) throws Exception {
+    static byte[] decryptAes(byte[] key, byte[] data) throws Exception {
         IvParameterSpec iv = new IvParameterSpec(new byte[16]);
         SecretKeySpec decryptKey = new SecretKeySpec(key, "AES");
         Cipher decryptor = Cipher.getInstance("AES/CBC/NoPadding");
@@ -389,7 +508,8 @@ public class AesDukpt {
      *
      * @param s A representation of a hexadecimal number without any leading qualifiers such as "0x" or "x".
      */
-    public static byte[] toByteArray(String s) {
+    static byte[] toByteArray(String s) {
+        s = s.replace(" ", "");
         int len = s.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
@@ -403,7 +523,7 @@ public class AesDukpt {
      *
      * @return A representation of a hexadecimal number without any leading qualifiers such as "0x" or "x".
      */
-    public static String toHex(byte[] bytes) {
+    static String toHex(byte[] bytes) {
         BigInteger bi = new BigInteger(1, bytes);
         return String.format("%0" + (bytes.length << 1) + "X", bi);
     }
@@ -413,14 +533,14 @@ public class AesDukpt {
      *
      * @return A string with zeros in the end, enter: 1234567890, return 12345678900000000000000000000000.
      */
-    public static String paddingDataText(String data) {
+    static String paddingDataText(String data) {
         int padding = 32;
         if (data.length() % padding != 0) {
-            StringBuilder dataToEncriptBuilder = new StringBuilder(data);
-            while (dataToEncriptBuilder.length() % padding != 0) {
-                dataToEncriptBuilder.append("0");
+            StringBuilder dataToEncryptBuilder = new StringBuilder(data);
+            while (dataToEncryptBuilder.length() % padding != 0) {
+                dataToEncryptBuilder.append("0");
             }
-            data = dataToEncriptBuilder.toString();
+            data = dataToEncryptBuilder.toString();
         }
 
         return data;
