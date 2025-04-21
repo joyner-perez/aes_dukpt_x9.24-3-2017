@@ -35,12 +35,15 @@ How to install with Maven
             </repository>
         </repositories>
 
-   1. Add the dependency:
+1. Add the dependency:
 
-           <dependency>
-               <groupId>com.github.joyner-perez</groupId>
-               <artifactId>aes_dukpt_x9.24-3-2017</artifactId>
-               <version>1.1.0</version>
-           </dependency>
+          <dependency>
+              <groupId>com.github.joyner-perez</groupId>
+              <artifactId>aes_dukpt_x9.24-3-2017</artifactId>
+              <version>1.1.0</version>
+          </dependency>
 
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=joyner-perez/aes_dukpt_x9.24-3-2017&type=Date)](https://www.star-history.com/#joyner-perez/aes_dukpt_x9.24-3-2017&Date)
